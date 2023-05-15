@@ -1,0 +1,35 @@
+version: 0.2
+phases:
+  install:
+    runtime-versions:
+        python: 3.9
+  pre_build:
+    on-failure: ABORT
+    commands:
+      - echo Validating template
+      - sam validate --config-env dev --debug
+  build:
+    commands:
+      - echo Building Dev environment
+      - echo "====================="
+      - sam package --template-file template.yaml --output-template-file package.yml --region eu-central-1 --s3-bucket $BUILD_ARTIFACT_BUCKET --s3-prefix $PIPELINE_NAME/artifacts/dev
+
+      - echo Building Prod environment
+      - echo "====================="
+      - sam package --template-file template.yaml --output-template-file package.yml --region eu-central-1 --s3-bucket $BUILD_ARTIFACT_BUCKET --s3-prefix $PIPELINE_NAME/artifacts/prod
+  post_build:
+    commands:
+      - echo Deploying Dev environment
+      - echo "====================="
+      - sam deploy --template-file package.yml --stack-name $STACK_NAME --s3-bucket $BUILD_ARTIFACT_BUCKET --s3-prefix $PIPELINE_NAME/artifacts/dev --force-upload --region eu-central-1 --config-env dev --no-fail-on-empty-changeset --debug
+
+      - echo Deploying Prod environment
+      - echo "====================="
+      - sam deploy --template-file package.yml --stack-name $STACK_NAME --s3-bucket $BUILD_ARTIFACT_BUCKET --s3-prefix $PIPELINE_NAME/artifacts/prod --force-upload --region eu-central-1 --config-env prd --no-fail-on-empty-changeset --debug
+artifacts:
+  type: zip
+  files:
+    - artifacts/**/*
+    - template.yaml
+    - package.yml
+    - requirements.txt

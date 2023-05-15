@@ -1,0 +1,31 @@
+version = 0.1
+
+[dev.deploy.parameters]
+s3_bucket = "mediascale-code-pipeline-artifacts-bucket"
+capabilities = "CAPABILITY_IAM"
+confirm_changeset = false
+region = "eu-central-1"
+s3_prefix = ""
+stack_name = "rockerbox-ci-cd-stack"
+parameter_overrides = ["Environment=dev","ParamStoreName=/mediascale/weighwatchers/teads/rockerbox",
+    "QueryAthenaFunctionName=QueryAthenaRockerboxDev","SendEmailFunctionName=SendEmailRockerboxDev",
+    "FunctionRoleArn=arn:aws:iam::227956463654:role/executeLambdaRole","MemorySize=128",
+    "StepFunctionName=RockerboxPipelineDev",
+    "StepFunctionRole=arn:aws:iam::227956463654:role/StepFunctionsDataLakeCuratedLayer",
+    "EventRuleName=RuleRockerboxDev","EventRuleState=DISABLED"
+    ]
+
+[prd.deploy.parameters]
+s3_bucket = "mediascale-code-pipeline-artifacts-bucket"
+capabilities = "CAPABILITY_IAM"
+confirm_changeset = false
+region = "eu-central-1"
+s3_prefix = ""
+stack_name = "rockerbox-ci-cd-stack"
+parameter_overrides = ["Environment=prd","ParamStoreName=/mediascale/weighwatchers/teads/rockerbox",
+    "QueryAthenaFunctionName=QueryAthenaRockerbox","SendEmailFunctionName=SendEmailRockerbox",
+    "FunctionRoleArn=arn:aws:iam::227956463654:role/executeLambdaRole","MemorySize=128",
+    "StepFunctionName=RockerboxPipeline",
+    "StepFunctionRole=arn:aws:iam::227956463654:role/StepFunctionsDataLakeCuratedLayer",
+    "EventRuleName=RuleRockerbox","EventRuleState=ENABLED"
+    ]

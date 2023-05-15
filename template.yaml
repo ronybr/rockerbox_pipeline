@@ -1,0 +1,109 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Transform: 'AWS::Serverless-2016-10-31'
+Description: An AWS Serverless Specification template describing your function.
+Parameters:
+  Environment:
+    Description: Environment for the application.
+    Type: String
+    Default: dev
+    AllowedValues:
+      - dev
+      - prd
+  ParamStoreName:
+    Description: Generic parameter file
+    Type: String
+  QueryAthenaFunctionName:
+    Description: Lambda function that query the Athena database.
+    Type: String
+  SendEmailFunctionName:
+    Description: Lambda function that send the data via email.
+    Type: String
+  FunctionRoleArn:
+    Description: The ARN of the Lambda function.
+    Type: String
+  MemorySize:
+    Description: Lambda Memory size
+    Type: String
+  StepFunctionName:
+    Description: Step Function name
+    Type: String
+  StepFunctionRole:
+    Description: Role to trigger the Step Function
+    Type: String
+  EventRuleName:
+    Description: Event Rule name
+    Type: String
+  EventRuleState:
+    Description: Event Rule state
+    Type: String
+    Default: DISABLED
+    AllowedValues:
+      - ENABLED
+      - DISABLED
+Conditions:
+  IsProduction: !Equals [ !Ref Environment, 'prd' ]
+Resources:
+  ExecuteQueryAthenaLambdaFunction:
+    Type: 'AWS::Serverless::Function'
+    DeletionPolicy: Retain
+    UpdateReplacePolicy: Retain
+    Properties:
+      FunctionName: !Ref QueryAthenaFunctionName
+      Handler: lambda_function.lambda_handler
+      Runtime: python3.9
+      CodeUri: ExecuteQueryAthena/
+      Description: Execute query on Athena for the Rockerbox pipeline
+      MemorySize: !Ref MemorySize
+      Timeout: 600
+      Role: !Ref FunctionRoleArn
+  SendEmailLambdaFunction:
+    Type: 'AWS::Serverless::Function'
+    DeletionPolicy: Retain
+    UpdateReplacePolicy: Retain
+    Properties:
+      FunctionName: !Ref SendEmailFunctionName
+      Handler: lambda_function.lambda_handler
+      Runtime: python3.9
+      CodeUri: SendEmail/
+      Description: Send data to Rockerbox email
+      MemorySize: !Ref MemorySize
+      Timeout: 600
+      Role: !Ref FunctionRoleArn
+      Environment:
+        Variables:
+          environment: !Ref Environment
+          param_store_name: !Ref ParamStoreName
+      Layers:
+        - >-
+          arn:aws:lambda:eu-central-1:336392948345:layer:AWSDataWrangler-Python39:1
+  RockerboxStepFunction:
+    Type: 'AWS::Serverless::StateMachine'
+    DeletionPolicy: Retain
+    UpdateReplacePolicy: Retain
+    Properties:
+      Name: !Ref StepFunctionName
+      Role: !Ref StepFunctionRole
+      Type: STANDARD
+      DefinitionUri: statemachine/rockerbox_pipeline_step_function.asl.json
+      DefinitionSubstitutions:
+        SendEmailFunctionName: !Ref SendEmailFunctionName
+        SendEmailFunctionNameArn: !GetAtt SendEmailLambdaFunction.Arn
+        QueryAthenaFunctionName: !Ref QueryAthenaFunctionName
+        QueryAthenaFunctionNameArn: !GetAtt ExecuteQueryAthenaLambdaFunction.Arn
+        StepFunctionName: !Ref StepFunctionName
+        Environment: !Ref Environment
+  RockerboxEventRule:
+    Type: AWS::Events::Rule
+    DeletionPolicy: Retain
+    UpdateReplacePolicy: Retain
+    Condition: IsProduction
+    Properties:
+      Description: Trigger the Rockerbox pipeline
+      EventBusName: default
+      Name: !Ref EventRuleName
+      ScheduleExpression: cron(15 10 ? * MON *)
+      State: !Ref EventRuleState
+      Targets:
+        - Id: Id40139c62-068b-433d-9c48-f3e9dc7b0a7b
+          Arn: !Join [ "", [ "arn:aws:states:", !Ref "AWS::Region", ":", !Ref "AWS::AccountId", ":stateMachine:", !Ref StepFunctionName ] ]
+          RoleArn: !Join [ "", [ "arn:aws:iam::", !Ref "AWS::AccountId", ":role/service-role/AWS_Events_Invoke_Step_Functions_1765496058" ] ]
